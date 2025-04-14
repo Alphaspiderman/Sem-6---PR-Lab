@@ -12,28 +12,18 @@ x_test_cnn = np.expand_dims(x_test, axis=-1)
 x_train_kmeans = x_train.reshape(x_train.shape[0], -1)
 x_test_kmeans = x_test.reshape(x_test.shape[0], -1)
 
-num_clusters = 10
-kmeans = KMeans(n_clusters=num_clusters, random_state=42, n_init=10)
-kmeans.fit(x_train_kmeans)
-kmeans_labels = kmeans.predict(x_test_kmeans)
+km = KMeans(n_clusters=10, random_state=42, n_init=10)
+km.fit(x_train_kmeans)
+km_pred = km.predict(x_test_kmeans)
 
 
-def map_clusters_to_labels(kmeans_labels, y_true):
-    label_map = {}
-    for i in range(num_clusters):
-        cluster_mask = kmeans_labels == i
-        true_labels = y_true[cluster_mask]
-        if len(true_labels) > 0:
-            most_common_label = np.bincount(true_labels).argmax()
-            label_map[i] = most_common_label
-    return np.array([label_map[label] for label in kmeans_labels])
+label_map = np.array(
+    [np.bincount(y_train[km.labels_ == i]).argmax() for i in range(10)]
+)[km.predict(x_test_kmeans)]
 
+print(f"K-Means Accuracy: {accuracy_score(y_test, label_map):.4f}")
 
-mapped_labels = map_clusters_to_labels(kmeans_labels, y_test)
-kmeans_accuracy = accuracy_score(y_test, mapped_labels)
-print(f"K-Means Accuracy: {kmeans_accuracy:.4f}")
-
-model = keras.models.Sequential(
+cnn = keras.models.Sequential(
     [
         keras.layers.Conv2D(32, (3, 3), activation="relu", input_shape=(28, 28, 1)),
         keras.layers.MaxPooling2D((2, 2)),
@@ -44,16 +34,16 @@ model = keras.models.Sequential(
         keras.layers.Dense(10, activation="softmax"),
     ]
 )
-model.compile(
+cnn.compile(
     optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"]
 )
-model.fit(x_train_cnn, y_train, epochs=5, validation_data=(x_test_cnn, y_test))
-cnn_loss, cnn_accuracy = model.evaluate(x_test_cnn, y_test, verbose=0)
+cnn.fit(x_train_cnn, y_train, epochs=5, validation_data=(x_test_cnn, y_test))
+cnn_loss, cnn_accuracy = cnn.evaluate(x_test_cnn, y_test, verbose=0)
 print(f"CNN Accuracy: {cnn_accuracy:.4f}")
 
 fig, axes = plt.subplots(2, 5, figsize=(10, 4))
 for i, ax in enumerate(axes.flat):
-    sample_idx = np.where(kmeans_labels == i)[0][0]
+    sample_idx = np.where(km_pred == i)[0][0]
     ax.imshow(x_test[sample_idx], cmap="gray")
     ax.set_title(f"Cluster {i}")
     ax.axis("off")
